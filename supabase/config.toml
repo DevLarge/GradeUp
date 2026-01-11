@@ -1,0 +1,28 @@
+project_id = "gickamftamdbbmdqlvtx"
+
+[functions.generate-test-content]
+verify_jwt = false
+
+[functions.generate-practice-test]
+verify_jwt = false
+
+[functions.analyze-answers]
+verify_jwt = false
+
+[functions.analyze-learning-patterns]
+verify_jwt = false
+
+[functions.analyze-quiz-results]
+verify_jwt = false
+
+[functions.generate-study-session]
+verify_jwt = false
+
+[functions.analyze-test-reflection]
+verify_jwt = false
+
+[functions.generate-adaptive-study-plan]
+verify_jwt = false
+
+[functions.adapt-study-plan]
+verify_jwt = false
