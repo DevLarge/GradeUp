@@ -21,10 +21,10 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!anthropicApiKey) {
+      throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
     const supabase = createClient(supabaseUrl!, supabaseKey!);
@@ -90,19 +90,19 @@ Recent activity results: ${JSON.stringify(activityResults || {})}
 
 Please optimize the plan while keeping it realistic and achievable.`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-api-key': anthropicApiKey,
         'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' }
+          { role: 'user', content: systemPrompt + '\n\n' + userPrompt }
+        ]
       }),
     });
 
@@ -111,7 +111,7 @@ Please optimize the plan while keeping it realistic and achievable.`;
     }
 
     const aiData = await aiResponse.json();
-    const adaptedData = JSON.parse(aiData.choices[0].message.content);
+    const adaptedData = JSON.parse(aiData.content[0].text);
 
     // Update the study plan
     const { data: updatedPlan, error: updateError } = await supabase

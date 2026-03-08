@@ -16,10 +16,10 @@ serve(async (req) => {
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!anthropicApiKey) {
+      throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -89,18 +89,19 @@ Returner JSON i dette formatet:
 
     console.log('Generating practice test for user:', userId, 'subject:', subject);
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-api-key': anthropicApiKey,
         'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Lag en øveprøve basert på disse kravene.` }
-        ],
+          { role: 'user', content: systemPrompt + '\n\nLag en øveprøve basert på disse kravene.' }
+        ]
       }),
     });
 
@@ -110,7 +111,7 @@ Returner JSON i dette formatet:
       throw new Error(`AI API error: ${response.status}`);
     }
 
-    const aiData = await response.json();
+    const aiData = await resontent[0].tex
     const content = aiData.choices[0].message.content;
     
     // Extract JSON from response

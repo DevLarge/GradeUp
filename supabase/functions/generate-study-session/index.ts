@@ -22,7 +22,7 @@ serve(async (req) => {
       });
     }
 
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!;
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
@@ -183,19 +183,19 @@ Returner JSON i dette formatet:
 Tilpass vanskelighetsgraden og mengden forklaring basert på brukerens profil.
 Svar KUN med gyldig JSON.`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-api-key': anthropicApiKey,
         'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 5000,
         messages: [
-          { role: 'system', content: 'Du er en ekspert på pedagogikk og personlig tilpasset læring. Svar kun med gyldig JSON.' },
           { role: 'user', content: aiPrompt }
         ],
-        temperature: 0.8,
       }),
     });
 
@@ -209,7 +209,7 @@ Svar KUN med gyldig JSON.`;
     }
 
     const aiData = await aiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
+    const aiContent = aiData.content[0].text;
     
     // Extract JSON from response
     let session;

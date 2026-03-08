@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useTestContext, type GeneratedContent, type Test, type Assessment } from "@/contexts/TestContext";
 import { AIService } from "@/utils/aiService";
+import { AIServiceBackend } from "@/utils/aiServiceBackend";
 import TextAnalysis from "./TextAnalysis";
 import TestReflectionDialog from "./TestReflectionDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,11 +48,17 @@ const Tests = () => {
     
     let combinedContent = "";
     
-    // Analyze each file
+    // Analyze each file using backend
     for (const file of files) {
       console.log(`\n📄 Analyserer fil ${files.indexOf(file) + 1}/${files.length}: ${file.name}`);
-      const analysis = await AIService.analyzeDocument(file, subject);
-      combinedContent += analysis + "\n\n";
+      try {
+        const text = await AIService.readFileContent(file);
+        const analysis = await AIServiceBackend.analyzeDocument(text, subject);
+        combinedContent += analysis + "\n\n";
+      } catch (error) {
+        console.error(`Feil ved analysering av ${file.name}:`, error);
+        throw error;
+      }
     }
     
     console.log(`\n✅ Alle filer analysert. Total innholdslengde: ${combinedContent.length} tegn`);
