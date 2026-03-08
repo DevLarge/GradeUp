@@ -24,28 +24,35 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get user's learning patterns and activities
-    const { data: patterns } = await supabase
-      .from('learning_patterns')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    const { data: activities } = await supabase
-      .from('learning_activities')
+    // Get user's question attempts to analyze weak areas
+    const { data: attempts } = await supabase
+      .from('question_attempts')
       .select('*')
       .eq('user_id', userId)
       .eq('subject', subject)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(20);
 
-    // Analyze weak areas
-    const weakTopics = patterns?.subject_weaknesses?.[subject] || [];
-    const recentScores = activities?.map(a => a.score) || [];
-    const avgScore = recentScores.length > 0 
-      ? recentScores.reduce((a, b) => a + b, 0) / recentScores.length 
-      : 50;
+    // Analyze weak areas from attempts
+    const weakTopics: string[] = [];
+    const incorrectAttempts = attempts?.filter(a => !a.is_correct) || [];
+    const topicCounts: { [key: string]: number } = {};
+    
+    incorrectAttempts.forEach(attempt => {
+      if (attempt.topic) {
+        topicCounts[attempt.topic] = (topicCounts[attempt.topic] || 0) + 1;
+      }
+    });
 
+    // Get topics with most incorrect answers
+    Object.entries(topicCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .forEach(([topic]) => weakTopics.push(topic));
+
+    const correctCount = attempts?.filter(a => a.is_correct).length || 0;
+    const totalAttempts = attempts?.length || 0;
+    const avgScore = totalAttempts > 0 ? (correctCount / totalAttempts) * 100 : 50;
     const difficulty = avgScore > 80 ? 'hard' : avgScore > 60 ? 'medium' : 'easy';
 
     const systemPrompt = `Du er en ekspertlærer som lager realistiske øveprøver for elever.
@@ -111,8 +118,8 @@ Returner JSON i dette formatet:
       throw new Error(`AI API error: ${response.status}`);
     }
 
-    const aiData = await resontent[0].tex
-    const content = aiData.choices[0].message.content;
+    const aiData = await response.json();
+    const content = aiData.content[0].text;
     
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -122,28 +129,17 @@ Returner JSON i dette formatet:
     
     const practiceTest = JSON.parse(jsonMatch[0]);
 
-    // Save to database
-    const { data: savedTest, error: saveError } = await supabase
-      .from('practice_tests')
-      .insert({
-        user_id: userId,
+    // Return the generated test
+    return new Response(JSON.stringify({
+      success: true,
+      test: practiceTest,
+      metadata: {
         subject,
-        title: practiceTest.title,
-        topics,
-        questions: practiceTest.questions,
-        time_limit_minutes: practiceTest.timeLimit,
-        total_questions: practiceTest.questions.length,
-        difficulty_level: difficulty,
-      })
-      .select()
-      .single();
-
-    if (saveError) {
-      console.error('Error saving practice test:', saveError);
-      throw saveError;
-    }
-
-    return new Response(JSON.stringify(savedTest), {
+        topics: topics || [],
+        difficulty: difficulty,
+        generatedAt: new Date().toISOString(),
+      }
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

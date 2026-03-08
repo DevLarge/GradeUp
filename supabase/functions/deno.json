@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.ns"],
+    "target": "ES2020",
+    "allowJs": true,
+    "strict": false,
+    "moduleResolution": "node"
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.208.0/",
+    "supabase": "https://esm.sh/@supabase/supabase-js@2.38.4",
+    "anthropic": "https://esm.sh/@anthropic-ai/sdk@0.20.0"
+  }
+}
