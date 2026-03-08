@@ -40,25 +40,41 @@ const Tests = () => {
   // Get past tests that haven't been reflected on yet
   const pastTestsForReflection = tests.filter(test => isPast(test.date));
 
-  const generateContentFromFiles = async (files: File[], subject: string, testDate: Date): Promise<GeneratedContent> => {
+  const generateContent = async (
+    subject: string,
+    testDate: Date,
+    files: File[],
+    baseText: string
+  ): Promise<GeneratedContent> => {
     console.log('🚀 STARTER AI-GENERERING');
     console.log(`📁 Antall filer: ${files.length}`);
     console.log(`📚 Fag: ${subject}`);
     console.log(`📅 Prøvedato: ${testDate.toLocaleDateString()}`);
     
-    let combinedContent = "";
+    let combinedContent = baseText.trim();
+
+    if (combinedContent) {
+      console.log(`📝 Inkluderer ${combinedContent.length} tegn fra oppgaveark/tekstfelt`);
+    }
     
     // Analyze each file using backend
     for (const file of files) {
       console.log(`\n📄 Analyserer fil ${files.indexOf(file) + 1}/${files.length}: ${file.name}`);
       try {
         const text = await AIService.readFileContent(file);
+        if (!text.trim()) {
+          throw new Error(`Kunne ikke lese tekstinnhold fra ${file.name}`);
+        }
         const analysis = await AIServiceBackend.analyzeDocument(text, subject);
         combinedContent += analysis + "\n\n";
       } catch (error) {
         console.error(`Feil ved analysering av ${file.name}:`, error);
         throw error;
       }
+    }
+
+    if (!combinedContent.trim()) {
+      throw new Error('Ingen tekst tilgjengelig for AI-generering. Last opp en lesbar fil eller skriv inn tekst i oppgavefeltet.');
     }
     
     console.log(`\n✅ Alle filer analysert. Total innholdslengde: ${combinedContent.length} tegn`);
@@ -104,12 +120,28 @@ const Tests = () => {
 
         let generatedContent: GeneratedContent | undefined;
         
-        if (uploadedFiles.length > 0) {
-          generatedContent = await generateContentFromFiles(uploadedFiles, testSubject, testDate);
+        const hasFiles = uploadedFiles.length > 0;
+        const hasAssignmentText = assignmentSheet.trim().length > 0;
+
+        if (hasFiles || hasAssignmentText) {
+          generatedContent = await generateContent(testSubject, testDate, uploadedFiles, assignmentSheet);
           toast({
             title: "AI-innhold generert!",
             description: `Opprettet ${generatedContent.quizzes.length} quizer, ${generatedContent.tests.length} tester, ${generatedContent.flashcards.length} flashkort og ${generatedContent.readingTexts.length} lesetekster`,
           });
+
+          if (
+            generatedContent.quizzes.length === 0 &&
+            generatedContent.tests.length === 0 &&
+            generatedContent.flashcards.length === 0 &&
+            generatedContent.readingTexts.length === 0
+          ) {
+            toast({
+              title: "AI svarte, men ingen oppgaver ble tolket",
+              description: "Prøv kortere og mer konkret tekst, eller last opp en annen filtype.",
+              variant: "destructive"
+            });
+          }
         }
 
         const newTest: Test = {

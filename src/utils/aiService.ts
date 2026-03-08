@@ -62,7 +62,7 @@ Anbefalte fokusområder:
 - Forståelse av sammenhenger`;
   }
 
-  private static async readFileContent(file: File): Promise<string> {
+  static async readFileContent(file: File): Promise<string> {
     // Handle DOCX files with mammoth
     if (file.name.toLowerCase().endsWith('.docx')) {
       console.log('📄 Parsing DOCX file...');
