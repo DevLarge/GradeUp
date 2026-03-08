@@ -42,12 +42,11 @@ const Notes = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // If no user, try to load from localStorage as fallback
-        const savedNotes = localStorage.getItem("study_notes");
-        if (savedNotes) {
-          const parsed = JSON.parse(savedNotes);
-          setNotes(parsed);
-        }
+        toast({
+          title: "Logg inn påkrevdt",
+          description: "Du må være logget inn for å se notater",
+          variant: "destructive"
+        });
         return;
       }
 
@@ -88,24 +87,10 @@ const Notes = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // Fallback to localStorage if no user
-        const newNote = {
-          id: Date.now().toString(),
-          subject: selectedSubject,
-          content: currentNote.trim(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        const updatedNotes = [newNote, ...notes];
-        setNotes(updatedNotes);
-        localStorage.setItem("study_notes", JSON.stringify(updatedNotes));
-        setCurrentNote("");
-        setSelectedSubject("");
-        
         toast({
-          title: "Lagret!",
-          description: "Notatet ditt er lagret lokalt"
+          title: "Feil",
+          description: "Du må være logget inn for å lagre notater",
+          variant: "destructive"
         });
         setIsLoading(false);
         return;
@@ -148,14 +133,10 @@ const Notes = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // Fallback to localStorage
-        const updatedNotes = notes.filter(n => n.id !== id);
-        setNotes(updatedNotes);
-        localStorage.setItem("study_notes", JSON.stringify(updatedNotes));
-        
         toast({
-          title: "Slettet",
-          description: "Notatet er fjernet"
+          title: "Feil",
+          description: "Du må være logget inn",
+          variant: "destructive"
         });
         return;
       }

@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Brain, Save, Trash2, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Select,
   SelectContent,
@@ -56,80 +57,110 @@ const NotesPage = () => {
     "Generelt"
   ];
 
-  // Load notes and draft from localStorage
+  // Load initial notes from Supabase
   useEffect(() => {
-    const saved = localStorage.getItem("subject_notes");
-    if (saved) {
-      try {
-        setNotes(JSON.parse(saved));
-      } catch (e) {
-        console.error("Error loading notes:", e);
-      }
-    }
-
-    // Load draft
-    const draft = localStorage.getItem("note_draft");
-    const draftSubject = localStorage.getItem("note_draft_subject");
-    if (draft) setCurrentNote(draft);
-    if (draftSubject) setSelectedSubject(draftSubject);
+    loadNotesFromSupabase();
   }, []);
 
-  // Auto-save draft to localStorage when typing
-  useEffect(() => {
-    if (currentNote) {
-      localStorage.setItem("note_draft", currentNote);
-    } else {
-      localStorage.removeItem("note_draft");
+  const loadNotesFromSupabase = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Du må være logget inn for å se notater");
+      return;
     }
-  }, [currentNote]);
-
-  useEffect(() => {
-    if (selectedSubject) {
-      localStorage.setItem("note_draft_subject", selectedSubject);
-    } else {
-      localStorage.removeItem("note_draft_subject");
+    
+    const { data } = await supabase
+      .from("notes")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    
+    if (data) {
+      const mappedNotes = data.map(n => ({
+        id: n.id,
+        subject: n.subject,
+        content: n.content,
+        timestamp: n.created_at
+      }));
+      setNotes(mappedNotes);
     }
-  }, [selectedSubject]);
+  };
 
   const saveNote = async () => {
     if (!currentNote.trim() || !selectedSubject) return;
 
-    const newNote: Note = {
-      id: Date.now().toString(),
-      subject: selectedSubject,
-      content: currentNote.trim(),
-      timestamp: new Date().toISOString()
-    };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Du må være logget inn for å lagre notater");
+      return;
+    }
 
-    const updatedNotes = [newNote, ...notes];
-    setNotes(updatedNotes);
-    localStorage.setItem("subject_notes", JSON.stringify(updatedNotes));
-    
-    // Track learning activity - AI learns from your note-taking habits
-    await trackActivity({
-      activityType: 'note',
-      subject: selectedSubject,
-      metadata: {
-        noteLength: currentNote.trim().length,
-        wordCount: currentNote.trim().split(/\s+/).length,
-        studyType: 'note_taking'
-      }
-    });
-    
-    // Clear draft and form
-    setCurrentNote("");
-    setSelectedSubject("");
-    localStorage.removeItem("note_draft");
-    localStorage.removeItem("note_draft_subject");
-    
-    toast.success("Notat lagret! Din AI-kompis lærer av din studiestil.");
+    try {
+      const { data, error } = await supabase
+        .from("notes")
+        .insert({
+          user_id: user.id,
+          subject: selectedSubject,
+          content: currentNote.trim()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newNote: Note = {
+        id: data.id,
+        subject: data.subject,
+        content: data.content,
+        timestamp: data.created_at
+      };
+
+      setNotes([newNote, ...notes]);
+      
+      // Track learning activity
+      await trackActivity({
+        activityType: 'note',
+        subject: selectedSubject,
+        metadata: {
+          noteLength: currentNote.trim().length,
+          wordCount: currentNote.trim().split(/\s+/).length,
+          studyType: 'note_taking'
+        }
+      });
+      
+      // Clear form
+      setCurrentNote("");
+      setSelectedSubject("");
+      
+      toast.success("Notat lagret!");
+    } catch (error) {
+      console.error("Error saving note:", error);
+      toast.error("Kunne ikke lagre notatet");
+    }
   };
 
-  const deleteNote = (id: string) => {
-    const updatedNotes = notes.filter(n => n.id !== id);
-    setNotes(updatedNotes);
-    localStorage.setItem("subject_notes", JSON.stringify(updatedNotes));
-    toast.success("Notat slettet!");
+  const deleteNote = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Du må være logget inn");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("notes")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      setNotes(notes.filter(n => n.id !== id));
+      toast.success("Notat slettet!");
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      toast.error("Kunne ikke slette notatet");
+    }
   };
 
   const filteredNotes = filterSubject === "all" 

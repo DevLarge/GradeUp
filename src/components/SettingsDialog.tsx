@@ -10,7 +10,6 @@ import { Settings, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import ApiKeySettings from "./ApiKeySettings";
 
 interface SettingsDialogProps {
   children?: React.ReactNode;
@@ -194,10 +193,6 @@ const SettingsDialog = ({ children }: SettingsDialogProps) => {
             <Button onClick={handleSave} className="flex-1">
               Lagre innstillinger
             </Button>
-          </div>
-          
-          <div className="pt-4 border-t">
-            <ApiKeySettings />
           </div>
           
           <div className="pt-4 border-t">

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User, Save } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   id: string;
@@ -31,25 +32,33 @@ const QuickAIChat = () => {
     }
   }, [messages]);
 
-  const saveConversationAsNote = () => {
+  const saveConversationAsNote = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Du må være logget inn for å lagre notater");
+      return;
+    }
+    
     const conversationText = messages
       .filter(m => m.type === "user" || m.type === "ai")
       .map(m => `${m.type === "user" ? "Meg" : "AI"}: ${m.content}`)
       .join("\n\n");
-
-    const savedNotes = localStorage.getItem("subject_notes");
-    const notes = savedNotes ? JSON.parse(savedNotes) : [];
     
-    const newNote = {
-      id: Date.now().toString(),
-      subject: "Generelt",
-      content: conversationText,
-      timestamp: new Date().toISOString()
-    };
+    try {
+      const { error } = await supabase
+        .from("notes")
+        .insert({
+          user_id: user.id,
+          subject: "Samtale",
+          content: conversationText
+        });
 
-    notes.unshift(newNote);
-    localStorage.setItem("subject_notes", JSON.stringify(notes));
-    toast.success("Samtale lagret i Mine Notater!");
+      if (error) throw error;
+      toast.success("Samtale lagret i Mine Notater!");
+    } catch (error) {
+      console.error("Error saving conversation:", error);
+      toast.error("Kunne ikke lagre samtalen");
+    }
   };
 
   const handleSendMessage = async () => {
