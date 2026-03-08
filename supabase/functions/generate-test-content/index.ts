@@ -12,10 +12,10 @@ serve(async (req) => {
 
   try {
     const { content, subject, type, count } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    if (!anthropicApiKey) {
+      throw new Error('ANTHROPIC_API_KEY is not configured');
     }
 
     let systemPrompt = '';
@@ -108,29 +108,32 @@ Returner BARE et JSON-array uten ekstra tekst:
 ]`;
     }
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'x-api-key': anthropicApiKey,
         'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      console.error('Anthropic API error:', response.status, errorText);
+      throw new Error(`Anthropic API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const generatedText = data.choices[0].message.content;
+    const generatedText = data.content?.[0]?.text || '';
+    if (!generatedText) {
+      throw new Error('Tom respons fra Anthropic API');
+    }
     
     // Extract JSON from response
     const jsonMatch = generatedText.match(/\[[\s\S]*\]/);

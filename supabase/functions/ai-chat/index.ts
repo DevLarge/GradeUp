@@ -10,26 +10,27 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY is not configured');
+    if (!anthropicApiKey) throw new Error('ANTHROPIC_API_KEY is not configured');
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const anthropicMessages = (messages || []).map((message: { role?: string; content?: string }) => {
+      const role = message.role === 'assistant' ? 'assistant' : 'user';
+      return { role, content: message.content || '' };
+    });
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { 
-            role: "system", 
-            content: "Du er en hjelpsom AI-studieassistent på norsk. Du hjelper elever med å forstå fagstoff, gi studietips, forklare konsepter og svare på spørsmål om skolefag. Du er vennlig, tålmodig og gir klare forklaringer. Du snakker alltid på norsk."
-          },
-          ...messages,
-        ],
-        stream: true,
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1800,
+        system: 'Du er en hjelpsom AI-studieassistent på norsk. Du hjelper elever med å forstå fagstoff, gi studietips, forklare konsepter og svare på spørsmål om skolefag. Du er vennlig, tålmodig og gir klare forklaringer. Du snakker alltid på norsk.',
+        messages: anthropicMessages,
       }),
     });
 
@@ -40,21 +41,31 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Betalingskrav, vennligst legg til midler i Lovable AI workspace." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+      console.error('Anthropic API error:', response.status, t);
+      return new Response(JSON.stringify({ error: 'AI API error' }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(response.body, {
+    const data = await response.json();
+    const content = data.content?.[0]?.text || '';
+
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        const openAiLikeChunk = {
+          choices: [{ delta: { content } }],
+        };
+
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(openAiLikeChunk)}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

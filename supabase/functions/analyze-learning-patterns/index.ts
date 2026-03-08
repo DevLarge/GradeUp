@@ -24,7 +24,14 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY')!;
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+
+    if (!anthropicApiKey) {
+      return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -78,7 +85,7 @@ serve(async (req) => {
       }))
     };
 
-    // Call Lovable AI to analyze patterns
+    // Call Anthropic to analyze patterns
     const aiPrompt = `Du er en AI-læringsassistent som analyserer elevers læringsmønstre. 
     
 Analyser følgende data om en elev:
@@ -120,19 +127,18 @@ Analyser og returner JSON med følgende struktur (kun JSON, ingen ekstra tekst):
   }
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-api-key': anthropicApiKey,
         'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: 'Du er en ekspert på læringsanalyse. Svar kun med gyldig JSON.' },
-          { role: 'user', content: aiPrompt }
-        ],
-        temperature: 0.7,
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        system: 'Du er en ekspert på læringsanalyse. Svar kun med gyldig JSON.',
+        messages: [{ role: 'user', content: aiPrompt }],
       }),
     });
 
@@ -146,7 +152,13 @@ Analyser og returner JSON med følgende struktur (kun JSON, ingen ekstra tekst):
     }
 
     const aiData = await aiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
+    const aiContent = aiData.content?.[0]?.text || '';
+    if (!aiContent) {
+      return new Response(JSON.stringify({ error: 'Empty AI analysis response' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
     // Extract JSON from response
     let analysis;

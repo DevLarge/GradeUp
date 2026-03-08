@@ -20,10 +20,10 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+    const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
 
-    if (!lovableApiKey) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    if (!anthropicApiKey) {
+      throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
     const supabase = createClient(supabaseUrl!, supabaseKey!);
@@ -158,19 +158,18 @@ ${userContext}
 
 Husk: Tilpass til deres faktiske atferd mer enn deres preferanser!`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
+        'x-api-key': anthropicApiKey,
         'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' }
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
       }),
     });
 
@@ -181,7 +180,10 @@ Husk: Tilpass til deres faktiske atferd mer enn deres preferanser!`;
     const aiData = await aiResponse.json();
     
     // Clean the response content - remove markdown code blocks if present
-    let content = aiData.choices[0].message.content;
+    let content = aiData.content?.[0]?.text || '';
+    if (!content) {
+      throw new Error('Empty response from Anthropic API');
+    }
     content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     const planData = JSON.parse(content);
@@ -218,7 +220,7 @@ Husk: Tilpass til deres faktiske atferd mer enn deres preferanser!`;
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating study plan:', error);
     return new Response(JSON.stringify({ 
       error: error.message 
