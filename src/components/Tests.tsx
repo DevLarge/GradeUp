@@ -64,16 +64,16 @@ const Tests = () => {
     console.log(`\n✅ Alle filer analysert. Total innholdslengde: ${combinedContent.length} tegn`);
     console.log('\n🎯 Genererer quizer, tester, flashkort og lesetekster parallelt...');
     
-    // Generate content using AI
+    // Generate content using backend services
     const [quizzes, tests, flashcards, readingTexts] = await Promise.all([
-      AIService.generateQuizzes(combinedContent, subject),
-      AIService.generateTests(combinedContent, subject),
-      AIService.generateFlashcards(combinedContent, subject),
-      AIService.generateReadingTexts(combinedContent, subject, 8)
+      AIServiceBackend.generateQuizzes(combinedContent, subject),
+      AIServiceBackend.generateTests(combinedContent, subject),
+      AIServiceBackend.generateFlashcards(combinedContent, subject),
+      AIServiceBackend.generateReadingTexts(combinedContent, subject, 8)
     ]);
     
     console.log('\n📋 Genererer studieplan...');
-    const studyPlan = await AIService.generateStudyPlan(combinedContent, subject, testDate, readingTexts);
+    const studyPlan = await AIServiceBackend.generateStudyPlan(combinedContent, subject, testDate, readingTexts);
     
     console.log('\n✅ ALLE AI-OPPGAVER FULLFØRT!');
     console.log(`   • Quizer: ${quizzes.length}`);
@@ -218,19 +218,6 @@ const Tests = () => {
             <p className="text-muted-foreground text-lg">Planlegg kommende prøver og spor prestasjonene dine</p>
           </div>
         </div>
-
-        {/* API Key Status */}
-        {!localStorage.getItem('anthropic_api_key') && (
-          <Card className="p-4 bg-warning/5 border-warning/20">
-            <div className="flex items-center gap-3">
-              <Zap className="h-5 w-5 text-warning" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">AI-funksjoner er ikke aktivert</p>
-                <p className="text-xs text-muted-foreground">Legg til en Anthropic API-nøkkel for å generere quizer, tester og flashkort fra dokumenter</p>
-              </div>
-            </div>
-          </Card>
-        )}
 
         {/* Action Buttons */}
         <div className="grid gap-4 md:grid-cols-2">
